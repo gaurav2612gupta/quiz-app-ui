@@ -5,9 +5,12 @@ import jsLogo from '../assets/images/js.png';
 import pythonLogo from '../assets/images/python.png';
 import htmlLogo from '../assets/images/html.png';
 import sqlLogo from '../assets/images/sql.png';
+import { useNavigate } from 'react-router-dom';
+
 
 function TakeQuizPage() {
   const [link, setLink] = useState('');
+  const navigate = useNavigate();
   const topics = [
     { name: 'Java', logo: javaLogo },
     { name: 'JavaScript', logo: jsLogo },
@@ -23,12 +26,25 @@ function TakeQuizPage() {
     setLink(e.target.value);
   };
 
+  const extractQuizIdFromLink = (link) => {
+    // Logic to extract the quiz ID from the link
+    const regex = /quiz\/custom\/([a-zA-Z0-9-]+)/;
+    const match = link.match(regex);
+    return match ? match[1] : null;
+  };
+
   const handleStartQuizWithLink = () => {
     console.log(`Starting quiz with link: ${link}`);
+    if(link) {
+        const quizId = extractQuizIdFromLink(link); // Function to extract quiz ID from the link
+        navigate(`../quiz/custom/${quizId}`)
+    }
   };
 
   const handleStartQuizWithTopic = (topic) => {
     console.log(`Starting ${topic} quiz with ${questionCounts[topic]} questions`);
+    const numberOfQuestions = questionCounts[topic];
+    navigate(`/quiz?topic=${encodeURIComponent(topic)}&questions=${numberOfQuestions}`);
   };
 
   const increaseCount = (topic) => {

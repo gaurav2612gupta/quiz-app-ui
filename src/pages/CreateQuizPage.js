@@ -1,127 +1,155 @@
 import React, { useState } from 'react';
-import { Container, Form, Button, Alert, InputGroup } from 'react-bootstrap';
-import { useNavigate } from 'react-router-dom';
+import { Form, Button, Container, Alert, InputGroup, FormControl } from 'react-bootstrap';
+import axios from 'axios';
 
-function CreateQuiz() {
-  const navigate = useNavigate();
-  const [isLoggedIn, setIsLoggedIn] = useState(true); // Mock login state, replace with actual authentication logic
-  const [quizData, setQuizData] = useState({
-    topic: '',
-    description: '',
-    numberOfQuestions: 5,
-    questions: [],
-  });
-  const [shareableLink, setShareableLink] = useState('');
-  const [showLinkCopiedAlert, setShowLinkCopiedAlert] = useState(false);
+const CreateQuiz = () => {
+  const [quizTitle, setQuizTitle] = useState('');
+  const [numQuestions, setNumQuestions] = useState(0);
+  const [questions, setQuestions] = useState([]);
+  const [quizLink, setQuizLink] = useState('');
 
-  const handleLoginPrompt = () => {
-    return (
-      <Container className="mt-5">
-        <Alert variant="info">
-          You need to <Alert.Link href="/login">log in</Alert.Link> for creating a quiz.
-        </Alert>
-      </Container>
-    );
+  const handleNumQuestionsChange = (e) => {
+    const num = parseInt(e.target.value, 10);
+    setNumQuestions(num);
+    setQuestions(Array.from({ length: num }, (_, index) => ({
+      id: index + 1,
+      questionTitle: '',
+      options: ['', '', '', ''],
+      correctOption: ''
+    })));
   };
 
-  const handleCreateQuiz = (e) => {
+  const handleQuestionChange = (index, value) => {
+    const newQuestions = [...questions];
+    newQuestions[index].questionTitle = value;
+    setQuestions(newQuestions);
+  };
+
+  const handleOptionChange = (questionIndex, optionIndex, value) => {
+    const newQuestions = [...questions];
+    newQuestions[questionIndex].options[optionIndex] = value;
+    setQuestions(newQuestions);
+  };
+
+  const handleCorrectOptionChange = (questionIndex, optionIndex) => {
+    const newQuestions = [...questions];
+    newQuestions[questionIndex].correctOption = optionIndex;
+    setQuestions(newQuestions);
+  };
+
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    // Handle quiz creation logic here, e.g., save to database
-    // Mock logic for generating shareable link
-    const link = `https://example.com/quiz/${quizData.topic.replace(/\s+/g, '-')}`;
-    setShareableLink(link);
-    const quizId = 'unique-quiz-id'; // Replace with actual logic to get unique identifier
-    // Redirect to quiz page with quizId
-    navigate(`/quiz/${quizId}`);
-  };
 
-  const handleCopyLink = () => {
-    navigator.clipboard.writeText(shareableLink);
-    setShowLinkCopiedAlert(true);
-    setTimeout(() => setShowLinkCopiedAlert(false), 3000); // Hide alert after 3 seconds
-  };
-
-  const handleChange = (e) => {
-    const { name, value } = e.target;
-    setQuizData((prevData) => ({
-      ...prevData,
-      [name]: value,
+    const formattedQuestions = questions.map((question) => ({
+      questionTitle: question.questionTitle,
+      option1: question.options[0],
+      option2: question.options[1],
+      option3: question.options[2],
+      option4: question.options[3],
     }));
+
+    const correctResponseList = questions.map((question, index) => ({
+      id: index + 1,
+      response: question.options[question.correctOption],
+    }));
+
+    const requestBody = {
+      quizTitle,
+      questionList: formattedQuestions,
+      correctResponseList,
+    };
+
+    try {
+      const response = await axios.post('http://localhost:8765/quiz-service/quiz/createcustom', requestBody);
+      console.log("response : ", response.data);
+      setQuizLink("http://localhost:3000/quiz/custom/" + btoa(response.data));
+    } catch (error) {
+      console.error('Error adding quiz:', error);
+    }
+  };
+
+  const handleCopy = () => {
+    navigator.clipboard.writeText(quizLink);
+    alert('Link copied to clipboard!');
   };
 
   return (
-    <Container className="mt-5">
-      {!isLoggedIn && handleLoginPrompt()}
-
-      {isLoggedIn && (
-        <div>
-          <h1>Create Quiz</h1>
-          <Form onSubmit={handleCreateQuiz}>
-            <Form.Group controlId="topic">
-              <Form.Label>Topic</Form.Label>
+    <Container>
+      <h1 className="my-4">Create a Quiz</h1>
+      <Form onSubmit={handleSubmit}>
+        <Form.Group controlId="quizTitle">
+          <Form.Label>Quiz Title</Form.Label>
+          <Form.Control
+            type="text"
+            value={quizTitle}
+            onChange={(e) => setQuizTitle(e.target.value)}
+            required
+          />
+        </Form.Group>
+        <Form.Group controlId="numQuestions">
+          <Form.Label>Number of Questions</Form.Label>
+          <Form.Control
+            type="number"
+            value={numQuestions}
+            onChange={handleNumQuestionsChange}
+            min="1"
+            required
+          />
+        </Form.Group>
+        {questions.map((question, index) => (
+          <div key={index} className="mb-4">
+            <Form.Group controlId={`question-${index}`}>
+              <Form.Label>Question {index + 1}</Form.Label>
               <Form.Control
                 type="text"
-                placeholder="Enter topic"
-                name="topic"
-                value={quizData.topic}
-                onChange={handleChange}
+                value={question.questionTitle}
+                onChange={(e) => handleQuestionChange(index, e.target.value)}
                 required
               />
             </Form.Group>
-
-            <Form.Group controlId="description">
-              <Form.Label>Description</Form.Label>
-              <Form.Control
-                as="textarea"
-                rows={3}
-                placeholder="Enter description"
-                name="description"
-                value={quizData.description}
-                onChange={handleChange}
-                required
-              />
-            </Form.Group>
-
-            <Form.Group controlId="numberOfQuestions">
-              <Form.Label>Number of Questions</Form.Label>
-              <Form.Control
-                type="number"
-                placeholder="Enter number of questions"
-                name="numberOfQuestions"
-                value={quizData.numberOfQuestions}
-                onChange={handleChange}
-                required
-              />
-            </Form.Group>
-
-            {/* Additional logic for adding questions and options */}
-
-            <Button variant="primary" type="submit">
-              Create Quiz
+            {question.options.map((option, optionIndex) => (
+              <Form.Group key={optionIndex} controlId={`option-${index}-${optionIndex}`}>
+                <InputGroup>
+                  <InputGroup.Text>Option {optionIndex + 1}</InputGroup.Text>
+                  <FormControl
+                    type="text"
+                    value={option}
+                    onChange={(e) => handleOptionChange(index, optionIndex, e.target.value)}
+                    required
+                  />
+                  <InputGroup.Radio
+                    name={`correctOption-${index}`}
+                    value={optionIndex}
+                    checked={question.correctOption === optionIndex}
+                    onChange={() => handleCorrectOptionChange(index, optionIndex)}
+                  />
+                  <InputGroup.Text>Correct</InputGroup.Text>
+                </InputGroup>
+              </Form.Group>
+            ))}
+          </div>
+        ))}
+        <Button variant="primary" type="submit">
+          Create Quiz
+        </Button>
+      </Form>
+      {quizLink && (
+        <Alert variant="success" className="mt-4">
+          <p>Quiz Created! Here is your quiz link:</p>
+          <InputGroup>
+            <FormControl
+              type="text"
+              value={quizLink}
+              readOnly
+            />
+            <Button variant="outline-secondary" onClick={handleCopy}>
+              Click to Copy
             </Button>
-          </Form>
-
-          {shareableLink && (
-            <div className="mt-3">
-              <p>Shareable Link:</p>
-              <InputGroup className="mb-3">
-                <Form.Control type="text" value={shareableLink} readOnly />
-                <Button variant="outline-secondary" onClick={handleCopyLink}>
-                  Copy Link
-                </Button>
-              </InputGroup>
-
-              {showLinkCopiedAlert && (
-                <Alert variant="success" className="mt-2">
-                  Link copied to clipboard!
-                </Alert>
-              )}
-            </div>
-          )}
-        </div>
+          </InputGroup>
+        </Alert>
       )}
     </Container>
   );
-}
+};
 
 export default CreateQuiz;

@@ -1,95 +1,133 @@
 import React, { useState, useEffect } from 'react';
-import { Container, Form, Button, Alert } from 'react-bootstrap';
-import { useParams } from 'react-router-dom';
+import axios from 'axios';
+import { useLocation } from 'react-router-dom';
+import { Container, Card, Form, Button, Alert, Spinner } from 'react-bootstrap';
 
-function QuizPage() {
-  const { quizId } = useParams();
-  const [quizData, setQuizData] = useState(null); // Placeholder for quiz data
-  const [answers, setAnswers] = useState({});
-  const [showResult, setShowResult] = useState(false);
+const QuizPage = () => {
+  const [quizId, setQuizId] = useState(null);
+  const [quizData, setQuizData] = useState([]);
+  const [score, setScore] = useState(null);
+  const [responses, setResponses] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const location = useLocation();
 
-  // Example quiz data for demonstration
+  const queryParams = new URLSearchParams(location.search);
+  const quizTopic = queryParams.get('topic');
+  const noOfQuestions = parseInt(queryParams.get('questions'), 10);
+  const quizTitle = quizTopic ? `${quizTopic} Test` : '';
+
   useEffect(() => {
-    // Fetch quiz data based on quizId (e.g., from backend)
-    const fetchedQuizData = {
-      quizId: quizId,
-      questions: [
-        {
-          id: 1,
-          question: 'What is the capital of France?',
-          options: ['Paris', 'London', 'Berlin', 'Rome'],
-          correctAnswer: 'Paris',
-        },
-        {
-          id: 2,
-          question: 'Who painted the Mona Lisa?',
-          options: ['Leonardo da Vinci', 'Pablo Picasso', 'Vincent van Gogh', 'Michelangelo'],
-          correctAnswer: 'Leonardo da Vinci',
-        },
-      ],
+    if (quizTopic && noOfQuestions) {
+      createQuiz();
+    } else {
+      setLoading(false);
+      setError('Missing query parameters');
+    }
+  }, [quizTopic, noOfQuestions]);
+
+  const createQuiz = async () => {
+    const payload = {
+      topic: quizTopic,
+      quizTitle,
+      noOfQuestions
     };
-    setQuizData(fetchedQuizData);
-  }, [quizId]);
 
-  const handleAnswerChange = (questionId, selectedOption) => {
-    setAnswers((prevAnswers) => ({
-      ...prevAnswers,
-      [questionId]: selectedOption,
+    try {
+      const response = await axios.post('http://localhost:8765/quiz-service/quiz/create', payload);
+      setQuizId(response.data);
+      fetchQuiz(response.data);
+    } catch (error) {
+      handleRequestError(error, 'Error creating quiz');
+    }
+  };
+
+  const fetchQuiz = async (id) => {
+    try {
+      const response = await axios.post(`http://localhost:8765/quiz-service/quiz/getQuiz/${id}`);
+      setQuizData(response.data);
+      initializeResponses(response.data);
+      setLoading(false);
+    } catch (error) {
+      handleRequestError(error, 'Error fetching quiz');
+    }
+  };
+  
+  const initializeResponses = (data) => {
+    const initialResponses = data.map(question => ({
+      id: question.id,
+      response: ''
     }));
+    setResponses(initialResponses);
   };
 
-  const handleSubmitQuiz = (e) => {
-    e.preventDefault();
-    // Calculate score logic
-    let score = 0;
-    Object.keys(answers).forEach((questionId) => {
-      if (answers[questionId] === quizData.questions.find((q) => q.id === parseInt(questionId)).correctAnswer) {
-        score++;
-      }
-    });
-    setShowResult(true);
-    // Mock display of score, replace with your own logic
-    alert(`Your score: ${score} / ${quizData.questions.length}`);
+  const handleResponseChange = (questionId, option) => {
+    setResponses(prevResponses =>
+      prevResponses.map(response =>
+        response.id === questionId ? { ...response, response: option } : response
+      )
+    );
+  };
+  
+  const submitQuiz = async () => {
+    try {
+      const response = await axios.post(`http://localhost:8765/quiz-service/quiz/submit/${quizId}`, responses);
+      setScore(response.data);
+    } catch (error) {
+      handleRequestError(error, 'Error submitting quiz');
+    }
   };
 
-  if (!quizData) {
-    return <Container className="mt-5">Loading...</Container>;
-  }
+  const handleRequestError = (error, defaultMessage) => {
+    setLoading(false);
+    if (error.response) {
+      setError(`${defaultMessage}: ${error.response.data.message}`);
+      console.error('Server error:', error.response.data);
+    } else if (error.request) {
+      setError(`${defaultMessage}: No response from server`);
+      console.error('No response error:', error.request);
+    } else {
+      setError(`${defaultMessage}: ${error.message}`);
+      console.error('Error:', error.message);
+    }
+  };
 
   return (
-    <Container className="mt-5">
-      <h1>Quiz Page - {quizData.quizId}</h1>
-
-      <Form onSubmit={handleSubmitQuiz}>
-        {quizData.questions.map((question) => (
-          <div key={question.id} className="mb-4">
-            <h5>{question.question}</h5>
-            {question.options.map((option, index) => (
-              <Form.Check
-                key={index}
-                type="radio"
-                id={`${question.id}-${index}`}
-                label={option}
-                name={`question-${question.id}`}
-                onChange={() => handleAnswerChange(question.id, option)}
-                checked={answers[question.id] === option}
-              />
+    <Container>
+      <h1 className="mt-4 mb-4">Its time to check your {quizTopic} Knowledge </h1>
+      {loading && <Spinner animation="border" />}
+      {error && <Alert variant="danger">{error}</Alert>}
+      {!loading && !error && quizData.length > 0 && (
+        <div>
+          <Form onSubmit={(e) => { e.preventDefault(); submitQuiz(); }}>
+            {quizData.map((question, index) => (
+              <Card key={index} className="mb-4">
+                <Card.Body>
+                  <Card.Title>{question.questionTitle}</Card.Title>
+                  <Form.Group>
+                    {['option1', 'option2', 'option3', 'option4'].map((option, optIndex) => (
+                      <Form.Check
+                        key={optIndex}
+                        type="radio"
+                        id={`question-${question.id}-${optIndex}`}
+                        label={question[option]}
+                        checked={responses.find(r => r.id === question.id)?.response === question[option]}
+                        onChange={() => handleResponseChange(question.id, question[option])}
+                      />
+                    ))}
+                  </Form.Group>
+                </Card.Body>
+              </Card>
             ))}
-          </div>
-        ))}
-
-        <Button variant="primary" type="submit">
-          Submit Quiz
-        </Button>
-      </Form>
-
-      {showResult && (
-        <Alert variant="info" className="mt-4">
-          Quiz submitted! Check your score.
-        </Alert>
+            <Button variant="primary" type="submit" className='mb-5'>Submit Quiz</Button>
+          </Form>
+        </div>
+      )}
+      {score !== null && (
+        <Alert variant="success" className="mt-4">Your Score: {score}</Alert>
       )}
     </Container>
   );
-}
+};
 
 export default QuizPage;
