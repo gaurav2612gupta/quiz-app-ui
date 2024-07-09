@@ -49,7 +49,7 @@ const CreateQuiz = () => {
     }));
 
     const correctResponseList = questions.map((question, index) => ({
-      id: index + 1,
+      question: question.questionTitle,
       response: question.options[question.correctOption],
     }));
 
@@ -60,6 +60,7 @@ const CreateQuiz = () => {
     };
 
     try {
+      console.log(requestBody)
       const response = await axios.post('http://localhost:8765/quiz-service/quiz/createcustom', requestBody);
       console.log("response : ", response.data);
       setQuizLink("http://localhost:3000/quiz/custom/" + btoa(response.data));
@@ -99,7 +100,7 @@ const CreateQuiz = () => {
         {questions.map((question, index) => (
           <div key={index} className="mb-4">
             <Form.Group controlId={`question-${index}`}>
-              <Form.Label>Question {index + 1}</Form.Label>
+              <Form.Label className='mt-1'>Question {index + 1}</Form.Label>
               <Form.Control
                 type="text"
                 value={question.questionTitle}
@@ -109,7 +110,7 @@ const CreateQuiz = () => {
             </Form.Group>
             {question.options.map((option, optionIndex) => (
               <Form.Group key={optionIndex} controlId={`option-${index}-${optionIndex}`}>
-                <InputGroup>
+                <InputGroup className='mt-1'>
                   <InputGroup.Text>Option {optionIndex + 1}</InputGroup.Text>
                   <FormControl
                     type="text"
@@ -129,7 +130,7 @@ const CreateQuiz = () => {
             ))}
           </div>
         ))}
-        <Button variant="primary" type="submit">
+        <Button variant="primary" type="submit" className='mt-2'>
           Create Quiz
         </Button>
       </Form>

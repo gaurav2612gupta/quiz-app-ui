@@ -52,7 +52,7 @@ const QuizPage = () => {
       handleRequestError(error, 'Error fetching quiz');
     }
   };
-  
+
   const initializeResponses = (data) => {
     const initialResponses = data.map(question => ({
       id: question.id,
@@ -62,13 +62,14 @@ const QuizPage = () => {
   };
 
   const handleResponseChange = (questionId, option) => {
-    setResponses(prevResponses =>
-      prevResponses.map(response =>
+    setResponses(prevResponses => {
+      const updatedResponses = prevResponses.map(response =>
         response.id === questionId ? { ...response, response: option } : response
-      )
-    );
+      );
+      return updatedResponses;
+    });
   };
-  
+
   const submitQuiz = async () => {
     try {
       const response = await axios.post(`http://localhost:8765/quiz-service/quiz/submit/${quizId}`, responses);
